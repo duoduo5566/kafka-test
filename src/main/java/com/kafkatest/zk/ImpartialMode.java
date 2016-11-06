@@ -48,7 +48,7 @@ public class ImpartialMode {
             });
         }
 
-        Thread.sleep(120000);
+        Thread.sleep(300000);
         zk.close();
     }
 
