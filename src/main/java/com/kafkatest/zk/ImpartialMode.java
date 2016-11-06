@@ -13,23 +13,23 @@ import java.util.List;
  */
 public class ImpartialMode {
 
-    public static void main(String[] args) throws IOException, KeeperException, InterruptedException {
+    private static final String ZK_HOSTS = "192.168.56.5:2181,192.168.56.6:2181,192.168.56.7:2181";
+    private static final String ROOT_PATH = "/chroot";
+    private static final String LEADER_PATH = "/chroot/leader";
 
-        final String zkHosts = "192.168.56.5:2181,192.168.56.6:2181,192.168.56.7:2181";
-        final String rootPath = "/chroot";
-        final String leaderPath = "/chroot/leader";
+    public static void main(String[] args) throws IOException, KeeperException, InterruptedException {
 
         // 建立zookeeper连接，创建zk对象
         final ZooKeeper zk = new ZooKeeper(
-                zkHosts,
+                ZK_HOSTS,
                 6000,
                 (watchedEvent) -> System.out.println("stat:" + watchedEvent.getState())
         );
 
         // 创建父节点
-        createPersistParentNode(zk, rootPath);
-        String currentPath = createLeaderNode(zk, leaderPath);
-        String returnPath = getListenerNode(zk, rootPath, currentPath);
+        createPersistParentNode(zk, ROOT_PATH);
+        String currentPath = createEphemeralNode(zk, LEADER_PATH);
+        String returnPath = getListenerNode(zk, ROOT_PATH, currentPath);
 
         // 如果当前节点不是leader，则对当前节点的前一个节点的设置delete watcher。
         if (!currentPath.equals(returnPath)){
@@ -39,7 +39,7 @@ public class ImpartialMode {
                     switch (watchedEvent.getType()){
                         case NodeDeleted:
                             try {
-                                leaderElection(zk, rootPath);
+                                leaderElection(zk, ROOT_PATH);
                             } catch (KeeperException | InterruptedException e) {
                                 e.printStackTrace();
                             }
@@ -74,14 +74,20 @@ public class ImpartialMode {
         }
     }
 
-    private static String createLeaderNode(final ZooKeeper zk,
+    /***
+     * 创建临时的worker节点
+     * @param zk
+     * @param leaderPath
+     * @return
+     */
+    private static String createEphemeralNode(final ZooKeeper zk,
                                            final String leaderPath)
             throws KeeperException, InterruptedException {
         String leaderNode = zk.create(
                 leaderPath,
                 null,
                 ZooDefs.Ids.OPEN_ACL_UNSAFE,
-                CreateMode.PERSISTENT_SEQUENTIAL
+                CreateMode.EPHEMERAL_SEQUENTIAL
         );
 
         System.out.println("leader node [" + leaderNode + "] is created success.");
